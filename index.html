@@ -154,6 +154,59 @@
           mouseLeave: (e, node) => showSmallPorts(node, false)
         }));
 
+
+
+    myDiagram.nodeTemplateMap.add("FILL",
+    $(go.Node, "Spot",
+        { locationSpot: go.Spot.Center },
+         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+
+/*　↓ now edit ↓ */
+
+        new go.Binding("zOrder", "z-order").makeTwoWay(),
+
+/*　↑ now edit ↑ */
+
+
+        //new go.Binding("angle").makeTwoWay(),
+        // the main object is a Panel that surrounds a TextBlock with a Shape
+        $(go.Panel, "Auto",
+          { name: "PANEL" },
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+          $(go.Shape, "Rectangle",  // default figure
+            {
+              portId: "", // the default port: if no spot on link data, use closest side
+              fill: "rgba(255,0,0,0.5)",  // default color
+              stroke: null
+            },
+            new go.Binding("figure"),
+            new go.Binding("fill")),
+          $(go.TextBlock,
+            {
+              textAlign: "center",
+              font: "bold 11pt Helvetica, Arial, sans-serif",
+              margin: 5,
+              maxSize: new go.Size(NaN, NaN),
+              wrap: go.TextBlock.WrapFit,
+              editable: true
+            },
+            new go.Binding("text").makeTwoWay())
+        ),
+        // four small named ports, one on each side:
+        makePort("T", go.Spot.Top, true, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, true),
+        { // handle mouse enter/leave events to show/hide the ports
+          mouseEnter: (e, node) => showSmallPorts(node, true),
+          mouseLeave: (e, node) => showSmallPorts(node, false)
+        }));
+
+
+
+        
     myDiagram.nodeTemplateMap.add("PIN",
     $(go.Node, "Spot",
         { locationSpot: go.Spot.Center },
@@ -169,12 +222,14 @@
       //    new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
           $(go.Shape, "Circle",  // default figure
             {
-             strokeWidth: 1
+             strokeWidth: 1,
+             fill: "red"
             },
             new go.Binding("fill")  
             ))
         )
     );
+        
         
 //  myDiagram.select(myDiagram.nodes.first());
 
@@ -473,6 +528,7 @@
             { text: "Step", fill: "#FFFFFF" },
             { text: "Comment", figure: "RoundedRectangle", fill: "lightyellow" },
             { category: "PIN", fill: "red", resizable: false, showcomment: true },                       
+            { category: "FILL", fill: "rgba(255,0,0,0.3)", resizable: true, showcomment: true },                       
             { category: "", text: "category", fill: "lightyellow" },                       
             { isGroup: true, category: "grp-noLayout", text: "NoExp Group", figure: "RoundedRectangle", fill: "lightblue"},
             { isGroup: true, text: "H Group", figure: "RoundedRectangle", fill: "lightblue" , horiz: true }
