@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<!-- saved from url=(0043)file:///Users/haya/Downloads/draw_test.html -->
+<html lang="en"><head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <script src="gojs_lib.js"></script>
+
+<title>index</title>
+</head>
+<body>
+<div id="display">
+<script id="code">
+
+function relayoutNodes() {
+      myDiagram.nodes.each(n => {
+        if (!(n instanceof go.Group)) return;
+        n.layout.isValidLayout = false;  // force it to be invalid
+      });
+      myDiagram.layoutDiagram();
+    }
+
+  function init() {
+    const $ = go.GraphObject.make;
+    myDiagram =
+      $(go.Diagram, "myDiagramDiv",
+        {
+            // when a drag-drop occurs in the Diagram's background, make it a top-level node
+            mouseDrop: function(e){finishDrop(e, null);},
+            "commandHandler.archetypeGroupData": { isGroup: true, text: "Group", horiz: false },
+            "undoManager.isEnabled": true,
+            "draggingTool.dragsLink": true,
+            "draggingTool.isGridSnapEnabled": true,
+            "linkingTool.isUnconnectedLinkValid": true,
+            "linkingTool.portGravity": 15,
+            "relinkingTool.isUnconnectedLinkValid": true,
+            "relinkingTool.portGravity": 15,
+            "relinkingTool.fromHandleArchetype":
+                $(go.Shape, "Diamond", { segmentIndex: 0, cursor: "pointer", desiredSize: new go.Size(15, 15), fill: "tomato", stroke: "darkred" }),
+            "relinkingTool.toHandleArchetype":
+                $(go.Shape, "Diamond", { segmentIndex: -1, cursor: "pointer", desiredSize: new go.Size(15, 15), fill: "darkred", stroke: "tomato" }),
+            "linkReshapingTool.handleArchetype":
+                $(go.Shape, "Diamond", { desiredSize: new go.Size(15, 15), fill: "lightblue", stroke: "deepskyblue" }),
+            "rotatingTool.handleAngle": 270,
+            "rotatingTool.handleDistance": 30,
+            "rotatingTool.snapAngleMultiple": 30,
+            "rotatingTool.snapAngleEpsilon": 30,
+            "undoManager.isEnabled": true,
+            "ModelChanged": function(e) {
+              if (e.isTransactionFinished) {
+                document.getElementById("mySavedModel").textContent = myDiagram.model.toJson();
+              }
+            }
+        });
+
+/*
+    myDiagram.layout = $(go.LayeredDigraphLayout,
+      { columnSpacing: 50 });
+*/
+
+    // Define a function for creating a "port" that is normally transparent.
+    // The "name" is used as the GraphObject.portId, the "spot" is used to control how links connect
+    // and where the port is positioned on the node, and the boolean "output" and "input" arguments
+    // control whether the user can draw links from or to the port.
+    function makePort(name, spot, output, input) {
+      // the port is basically just a small transparent circle
+      return $(go.Shape, "Circle",
+        {
+          fill: null,  // not seen, by default; set to a translucent gray by showSmallPorts, defined below
+          stroke: null,
+          desiredSize: new go.Size(17, 17),
+          alignment: spot,  // align the port on the main Shape
+          alignmentFocus: spot,  // just inside the Shape
+          portId: name,  // declare this object to be a "port"
+          fromSpot: spot, toSpot: spot,  // declare where links may connect at this port
+          fromLinkable: output, toLinkable: input,  // declare whether the user may draw links to/from here
+          cursor: "pointer"  // show a different cursor to indicate potential link point
+        });
+    }
+
+    var nodeSelectionAdornmentTemplate =
+      $(go.Adornment, "Auto",
+        $(go.Shape, { fill: null, stroke: "deepskyblue", strokeWidth: 1.5, strokeDashArray: [4, 2] }),
+        $(go.Placeholder)
+      );
+
+    var nodeResizeAdornmentTemplate =
+      $(go.Adornment, "Spot",
+        { locationSpot: go.Spot.Right },
+        $(go.Placeholder),
+        $(go.Shape, { alignment: go.Spot.TopLeft, cursor: "nw-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+        $(go.Shape, { alignment: go.Spot.Top, cursor: "n-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+        $(go.Shape, { alignment: go.Spot.TopRight, cursor: "ne-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+
+        $(go.Shape, { alignment: go.Spot.Left, cursor: "w-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+        $(go.Shape, { alignment: go.Spot.Right, cursor: "e-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+
+        $(go.Shape, { alignment: go.Spot.BottomLeft, cursor: "se-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+        $(go.Shape, { alignment: go.Spot.Bottom, cursor: "s-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+        $(go.Shape, { alignment: go.Spot.BottomRight, cursor: "sw-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" })
+      );
+
+    var nodeRotateAdornmentTemplate =
+      $(go.Adornment,
+        { locationSpot: go.Spot.Center, locationObjectName: "ELLIPSE" },
+        $(go.Shape, "Ellipse", { name: "ELLIPSE", cursor: "pointer", desiredSize: new go.Size(9, 9), fill: "lightblue", stroke: "deepskyblue" }),
+        $(go.Shape, { geometryString: "M3.5 7 L3.5 30", isGeometryPositioned: true, stroke: "deepskyblue", strokeWidth: 1.5, strokeDashArray: [4, 2] })
+      );
+
+    myDiagram.nodeTemplateMap.add("",
+    $(go.Node, "Spot",
+        { locationSpot: go.Spot.Center },
+         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+
+/*　↓ now edit ↓ */
+
+        new go.Binding("zOrder", "z-order").makeTwoWay(),
+
+/*　↑ now edit ↑ */
+
+        //new go.Binding("angle").makeTwoWay(),
+        // the main object is a Panel that surrounds a TextBlock with a Shape
+        $(go.Panel, "Auto",
+          { name: "PANEL" },
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+          $(go.Shape, "Rectangle",  // default figure
+            {
+              portId: "", // the default port: if no spot on link data, use closest side
+              fill: "white",  // default color
+            },
+            new go.Binding("figure"),
+            new go.Binding("fill")),
+          $(go.TextBlock,
+            {
+              textAlign: "center",
+              font: "bold 11pt Helvetica, Arial, sans-serif",
+              margin: 5,
+              maxSize: new go.Size(NaN, NaN),
+              wrap: go.TextBlock.WrapFit,
+              editable: true
+            },
+            new go.Binding("text").makeTwoWay()),
+          $(go.Picture,
+          {},
+          new go.Binding("source", "img").makeTwoWay(),
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify)),
+          $(go.Shape, "Rectangle",  // default figure
+            {
+              fill: null,
+              fromLinkable: true, toLinkable: true, cursor: "pointer",
+              strokeWidth: 2
+            },
+            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify))
+        ),
+        // four small named ports, one on each side:
+        makePort("T", go.Spot.Top, true, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, true),
+        { // handle mouse enter/leave events to show/hide the ports
+          mouseEnter: (e, node) => showSmallPorts(node, true),
+          mouseLeave: (e, node) => showSmallPorts(node, false)
+        }));
+
+
+    myDiagram.nodeTemplateMap.add("IMAGE",
+    $(go.Node, "Spot",
+        { locationSpot: go.Spot.Center },
+         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+
+/*　↓ now edit ↓ */
+
+        new go.Binding("zOrder", "z-order").makeTwoWay(),
+
+/*　↑ now edit ↑ */
+
+
+        //new go.Binding("angle").makeTwoWay(),
+        // the main object is a Panel that surrounds a TextBlock with a Shape
+        $(go.Panel, "Auto",
+          { name: "PANEL",
+          desiredSize: new go.Size(90, 60)},
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+          $(go.Shape, "Rectangle",  // default figure
+            {
+              portId: "", // the default port: if no spot on link data, use closest side
+              fill: "white",  // default color
+            },
+            new go.Binding("figure"),
+            new go.Binding("fill")),
+          $(go.TextBlock,
+            {
+              textAlign: "center",
+              font: "bold 11pt Helvetica, Arial, sans-serif",
+              margin: 5,
+              maxSize: new go.Size(NaN, NaN),
+              wrap: go.TextBlock.WrapFit,
+              editable: true
+            },
+            new go.Binding("text").makeTwoWay()),
+          $(go.Picture,
+          {},
+          new go.Binding("source", "img").makeTwoWay(),
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify)),
+          $(go.Shape, "Rectangle",  // default figure
+            {
+              fill: null,
+              fromLinkable: true, toLinkable: true, cursor: "pointer",
+              strokeWidth: 2
+            },
+            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify))
+        ),
+        // four small named ports, one on each side:
+        makePort("T", go.Spot.Top, true, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, true),
+        { // handle mouse enter/leave events to show/hide the ports
+          mouseEnter: (e, node) => showSmallPorts(node, true),
+          mouseLeave: (e, node) => showSmallPorts(node, false)
+        }));
+
+
+    myDiagram.nodeTemplateMap.add("LABEL",
+    $(go.Node, "Spot",
+        { locationSpot: go.Spot.Center },
+         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+
+/*　↓ now edit ↓ */
+
+        new go.Binding("zOrder", "z-order").makeTwoWay(),
+
+/*　↑ now edit ↑ */
+
+
+        //new go.Binding("angle").makeTwoWay(),
+        // the main object is a Panel that surrounds a TextBlock with a Shape
+        $(go.Panel, "Auto",
+          { name: "PANEL", 
+            desiredSize: new go.Size(90, 30)},
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+          $(go.Shape, "Rectangle",  // default figure
+            {
+              portId: "", // the default port: if no spot on link data, use closest side
+              fill: "white",  // default color
+            },
+            new go.Binding("figure"),
+            new go.Binding("fill")),
+          $(go.TextBlock,
+            {
+              textAlign: "center",
+              font: "bold 11pt Helvetica, Arial, sans-serif",
+              margin: 5,
+              maxSize: new go.Size(NaN, NaN),
+              wrap: go.TextBlock.WrapFit,
+              editable: true
+            },
+            new go.Binding("text").makeTwoWay())
+        ),
+        // four small named ports, one on each side:
+        makePort("T", go.Spot.Top, true, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, true),
+        { // handle mouse enter/leave events to show/hide the ports
+          mouseEnter: (e, node) => showSmallPorts(node, true),
+          mouseLeave: (e, node) => showSmallPorts(node, false)
+        }));
+
+
+    myDiagram.nodeTemplateMap.add("FILL",
+    $(go.Node, "Spot",
+        { locationSpot: go.Spot.Center },
+         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+
+/*　↓ now edit ↓ */
+
+        new go.Binding("zOrder", "z-order").makeTwoWay(),
+
+/*　↑ now edit ↑ */
+
+
+        //new go.Binding("angle").makeTwoWay(),
+        // the main object is a Panel that surrounds a TextBlock with a Shape
+        $(go.Panel, "Auto",
+          { name: "PANEL" ,
+          desiredSize: new go.Size(90, 30)},
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+          $(go.Shape, "Rectangle",  // default figure
+            {
+              portId: "", // the default port: if no spot on link data, use closest side
+              fill: "rgba(255,0,0,0.6)",  // default color
+              stroke: null
+            },
+            new go.Binding("figure"),
+            new go.Binding("fill")),
+          $(go.TextBlock,
+            {
+              textAlign: "center",
+              font: "11pt Helvetica, Arial, sans-serif",
+              stroke: "red",
+              margin: 5,
+              maxSize: new go.Size(NaN, NaN),
+              wrap: go.TextBlock.WrapFit,
+              editable: true
+            },
+            new go.Binding("text").makeTwoWay())
+        ),
+        // four small named ports, one on each side:
+        makePort("T", go.Spot.Top, true, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, true),
+        { // handle mouse enter/leave events to show/hide the ports
+          //mouseEnter: (e, node) => showSmallPorts(node, true),
+          //mouseLeave: (e, node) => showSmallPorts(node, false)
+        }));
+
+
+
+        
+    myDiagram.nodeTemplateMap.add("PIN",
+    $(go.Node, "Spot",
+        { locationSpot: go.Spot.Center },
+        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+        new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+        new go.Binding("resizable", "resizable"),
+        // the main object is a Panel that surrounds a TextBlock with a Shape
+        $(go.Panel, "Auto",
+        { name: "PANEL" },
+        { desiredSize: new go.Size.parse("20 20") },
+        new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+      //    new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+          $(go.Shape, "Circle",  // default figure
+            {
+             strokeWidth: 0,
+             fill: "rgba(255,0,0,0.6)",  // default color
+            },
+            new go.Binding("fill")  
+            ))
+        )
+    );
+        
+        
+//  myDiagram.select(myDiagram.nodes.first());
+
+    function showSmallPorts(node, show) {
+      node.ports.each(port => {
+        if (port.portId !== "") {  // don't change the default port, which is the big shape
+          port.fill = show ? "rgba(0,0,0,.3)" : null;
+        }
+      });
+    }
+
+    var linkSelectionAdornmentTemplate =
+      $(go.Adornment, "Link",
+        $(go.Shape,
+          // isPanelMain declares that this Shape shares the Link.geometry
+          { isPanelMain: true, fill: null, stroke: "deepskyblue", strokeWidth: 0 })  // use selection object's strokeWidth
+      );
+
+    myDiagram.linkTemplateMap.add("",
+      $(go.Link,  // the whole link panel
+        { selectable: true, selectionAdornmentTemplate: linkSelectionAdornmentTemplate },
+        { relinkableFrom: true, relinkableTo: true, reshapable: true },
+        {
+          routing: go.Link.Orthogonal,
+          curve: go.Link.JumpOver,
+          corner: 5,
+          toShortLength: 4
+        },
+        new go.Binding("routing", "routing"),
+        new go.Binding("points").makeTwoWay(),
+        $(go.Shape,  // the link path shape
+          { isPanelMain: true, strokeWidth: 1 }),
+        $(go.Shape,  // the arrowhead
+          { toArrow: "Standard", stroke: null }),
+        $(go.Panel, "Auto",
+          new go.Binding("visible", "isSelected").ofObject(),
+          $(go.Shape, "RoundedRectangle",  // the link shape
+            { fill: "#F8F8F8", stroke: null }),
+          $(go.TextBlock,
+            {
+              textAlign: "center",
+              font: "10pt helvetica, arial, sans-serif",
+              stroke: "#919191",
+              margin: 2,
+              minSize: new go.Size(10, NaN),
+              editable: true
+            },
+            new go.Binding("text").makeTwoWay())
+        )
+      ));
+
+
+    // The one template for Groups can be configured to be either layout out its members
+    // horizontally or vertically, each with a different default color.
+    function makeLayout(horiz) {  // a Binding conversion function
+      if (horiz == true) {
+          return $(go.GridLayout,
+            {
+              wrappingWidth: Infinity, //alignment: go.GridLayout.Position,
+              cellSize: new go.Size(1, 1), spacing: new go.Size(4, 4),
+              sorting: go.GridLayout.Ascending,
+              comparer: function(pa, pb) {
+              const ax = pa.location.x;
+              const bx = pb.location.x;
+              if (isNaN(ax) || isNaN(bx)) return 0;
+              if (ax < bx) return -1;
+              if (ax > bx) return 1;
+              return 0;
+              }
+            });
+        } else if ( horiz == false) {
+          return $(go.GridLayout,
+            {
+              wrappingColumn: 1, //alignment: go.GridLayout.Position,
+              cellSize: new go.Size(1, 1), spacing: new go.Size(4, 4),
+              sorting: go.GridLayout.Ascending,
+              comparer: function(pa, pb) {
+              const ay = pa.location.y;
+              const by = pb.location.y;
+              if (isNaN(ay) || isNaN(by)) return 0;
+              if (ay < by) return -1;
+              if (ay > by) return 1;
+              return 0;
+              }
+            });
+        } else {
+          return $(go.GridLayout,
+            {
+            });
+        }
+      }
+
+
+    function groupColor() {  // a Binding conversion function
+      return "#FFDD33";
+      //horiz ? "#FFDD33" : "#33D3E5";
+    }
+
+    function groupFont() {  // a Binding conversion function
+      return "bold 16px sans-serif";
+      //horiz ? "bold 18px sans-serif" : "bold 16px sans-serif";
+    }
+
+    // this function is used to highlight a Group that the selection may be dropped into
+    function highlightGroup(e, grp, show) {
+        if (!grp) return;
+        e.handled = true;
+        if (show) {
+            // cannot depend on the grp.diagram.selection in the case of external drag-and-drops;
+            // instead depend on the DraggingTool.draggedParts or .copiedParts
+            var tool = grp.diagram.toolManager.draggingTool;
+            var map = tool.draggedParts || tool.copiedParts;  // this is a Map
+            // now we can check to see if the Group will accept membership of the dragged Parts
+            if (grp.canAddMembers(map.toKeySet())) {
+            grp.isHighlighted = true;
+            return;
+            }
+        }
+        grp.isHighlighted = false;
+    }
+
+
+    
+    myDiagram.groupTemplateMap.add("",
+      $(go.Group, "Auto",
+      {
+        background: "white",
+        ungroupable: true,
+        // highlight when dragging into the Group
+        mouseDragEnter: function(e, grp, prev) { highlightGroup(e, grp, true); },
+        mouseDragLeave: function(e, grp, next) { highlightGroup(e, grp, false); },
+        computesBoundsAfterDrag: true,
+        // when the selection is dropped into a Group, add the selected Parts into that Group;
+        // if it fails, cancel the tool, rolling back any changes
+        mouseDrop: finishDrop,
+        handlesDragDropForMembers: true,  // don't need to define handlers on member Nodes and Links
+        // Groups containing Groups lay out their members horizontally
+        layout: makeLayout(false) //makeLayout() => go.GridLayout obj
+        /*
+        subGraphExpandedChanged: grp => {
+              const shp = grp.resizeObject;
+              if (grp.diagram.undoManager.isUndoingRedoing) return;
+              if (grp.isSubGraphExpanded) {
+                shp.height = 100;
+              } else {
+                if (!isNaN(shp.height)) grp.diagram.model.set(grp.data, "savedBreadth", shp.height);
+                shp.height = NaN;
+              }
+              updateCrossLaneLinks(grp);
+            }
+            */
+      },
+      //below is header section
+      new go.Binding("layout", "horiz", makeLayout),
+      new go.Binding("background", "isHighlighted", function(h) {
+        return h ? "rgba(255,0,0,0.2)" : "white";
+      }).ofObject(),
+      $(go.Shape, "Rectangle",
+        { fill: "rgba(255,255,255,255,20)", stroke: groupColor(), strokeWidth: 2 },
+        //new go.Binding("stroke", "horiz", groupColor),
+        new go.Binding("stroke", "fill")),
+      $(go.Panel, "Vertical",  // title above Placeholder
+        $(go.Panel, "Horizontal",  // button next to TextBlock
+          { desiredSize: new go.Size(NaN, NaN) , stretch: go.GraphObject.Horizontal, background: groupColor() },
+         
+          //new go.Size(NaN, 0)
+
+          //new go.Binding("background", "horiz", groupColor),
+          new go.Binding("background", "fill"),
+         $("SubGraphExpanderButton",
+            { alignment: go.Spot.Right, margin: 10 }),
+          $(go.TextBlock,
+            {
+              alignment: go.Spot.Left,
+              editable: true,
+              margin: 5,
+              font: groupFont(),
+              opacity: 0.75,  // allow some color to show through
+              stroke: "#404040"
+            },
+            //new go.Binding("font", "horiz", groupFont),
+            new go.Binding("text", "text").makeTwoWay())
+        ),  // end Horizontal Panel
+        $(go.Placeholder,
+          { padding: 5, alignment: go.Spot.TopLeft })
+      ),  // end Vertical Panel
+        // four small named ports, one on each side:
+        makePort("T", go.Spot.Top, false, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, false),
+        { // handle mouse enter/leave events to show/hide the ports
+          mouseEnter: (e, node) => showSmallPorts(node, true),
+          mouseLeave: (e, node) => showSmallPorts(node, false)
+        }
+      ));
+  
+    myDiagram.groupTemplateMap.add("NoLayout",
+      $(go.Group, "Auto",
+      { background: "white",
+        ungroupable: true,
+        // highlight when dragging into the Group
+        mouseDragEnter: function(e, grp, prev) { highlightGroup(e, grp, true); },
+        mouseDragLeave: function(e, grp, next) { highlightGroup(e, grp, false); },
+        computesBoundsAfterDrag: true,
+        // when the selection is dropped into a Group, add the selected Parts into that Group;
+        // if it fails, cancel the tool, rolling back any changes
+        mouseDrop: finishDrop,
+        handlesDragDropForMembers: true,  // don't need to define handlers on member Nodes and Links
+        // Groups containing Groups lay out their members horizontally
+       // layout: makeLayout(false), //auto layout
+      },
+//      new go.Binding("layout", "horiz", makeLayout(true)),
+      new go.Binding("background", "isHighlighted", function(h) {
+        return h ? "rgba(255,0,0,0.2)" : "white";
+      }).ofObject(),
+      $(go.Shape, "Rectangle", //outer frame
+        { fill: "rgba(255,255,255,255,20)", stroke: groupColor(), strokeWidth: 2 },
+       // new go.Binding("stroke", "horiz", groupColor),
+        new go.Binding("stroke", "fill")), 
+      $(go.Panel, "Vertical",  // title above Placeholder
+        $(go.Panel, "Horizontal",  // button next to TextBlock
+          { desiredSize: new go.Size(NaN, 35) ,stretch: go.GraphObject.Horizontal, background: groupColor() },
+         // new go.Binding("background", "horiz", groupColor),
+
+
+         /*
+         new go.Binding("desiredSize", "title", function(t){
+           console.log('call');
+           return t ? console.log(new go.Size(NaN, 40)) : console.log(new go.Size(0, 0));
+         }).ofObject(),
+        */
+
+          new go.Binding("background", "fill"),
+          $("SubGraphExpanderButton",
+            { alignment: go.Spot.Right, margin: 10 }),
+          $(go.TextBlock,
+            {
+              alignment: go.Spot.Left,
+              editable: true,
+              margin: 10,
+              font: groupFont(),
+              opacity: 0.75,  // allow some color to show through
+              stroke: "404040"
+            },
+            //new go.Binding("font", "horiz", groupFont),
+            new go.Binding("text", "text").makeTwoWay())
+        ),  // end Horizontal Panel
+            $(go.Placeholder,
+            { padding: 0, alignment: go.Spot.TopLeft }
+            ) 
+          ),  // end Vertical Panel
+        // four small named ports, one on each side:
+        makePort("T", go.Spot.Top, false, true),
+        makePort("L", go.Spot.Left, true, true),
+        makePort("R", go.Spot.Right, true, true),
+        makePort("B", go.Spot.Bottom, true, false),
+        { // handle mouse enter/leave events to show/hide the ports
+          mouseEnter: (e, node) => showSmallPorts(node, true),
+          mouseLeave: (e, node) => showSmallPorts(node, false)
+        }
+      ));
+
+    // temporary links used by LinkingTool and RelinkingTool are also orthogonal:
+    myDiagram.toolManager.linkingTool.temporaryLink.routing = go.Link.Orthogonal;
+    myDiagram.toolManager.relinkingTool.temporaryLink.routing = go.Link.Orthogonal;
+
+    // initialize the Palette that is on the left side of the page
+    myPalette =
+      $(go.Palette, "myPaletteDiv",  // must name or refer to the DIV HTML element
+        {
+          nodeTemplateMap: myDiagram.nodeTemplateMap,
+        　groupTemplateMap: myDiagram.groupTemplateMap,
+        //  maxSelectionCount: 1,
+        
+        /*
+          linkTemplate: // simplify the link template, just in this Palette
+            $(go.Link,
+              { // because the GridLayout.alignment is Location and the nodes have locationSpot == Spot.Center,
+                // to line up the Link in the same manner we have to pretend the Link has the same location spot
+                locationSpot: go.Spot.Center,
+                selectionAdornmentTemplate:
+                  $(go.Adornment, "Link",
+                    { locationSpot: go.Spot.Center },
+                    $(go.Shape,
+                      { isPanelMain: true, fill: null, stroke: "deepskyblue", strokeWidth: 0 }),
+                    $(go.Shape,  // the arrowhead
+                      { toArrow: "Standard", stroke: null })
+                  )
+              },
+              {
+                routing: go.Link.AvoidsNodes,
+                curve: go.Link.JumpOver,
+                corner: 5,
+                toShortLength: 4
+              },
+              new go.Binding("points"),
+              $(go.Shape,  // the link path shape
+                { isPanelMain: true, strokeWidth: 2 }),
+              $(go.Shape,  // the arrowhead
+                { toArrow: "Standard", stroke: null })
+            ),
+         */
+         
+            model: new go.GraphLinksModel([  // specify the contents of the Palette
+            { category: "LABEL", text: "Label", fill: "#FFFFFF" },
+            { category: "IMAGE", text: "IMAGE", fill: "#FFFFFF" },
+            { category: "FILL", fill: "rgba(255,0,0,0.6)", resizable: true, showcomment: true },                       
+            { category: "PIN", fill: "rgba(255,0,0,0.6)", resizable: false, showcomment: true },                       
+            { category: "NoLayout", isGroup: true,text: "NoLayout", figure: "RoundedRectangle", fill: "lightblue", title: false },
+            { category: "", isGroup: true, text: "Layout", figure: "RoundedRectangle", fill: "lightblue" , horiz: true, title: false }
+          ])
+        });
+
+      function reexpand(e) {
+          myDiagram.commit(function(diag) {
+              var level = parseInt(document.getElementById("levelSlider").value);
+              diag.findTopLevelGroups().each(function(g) { expandGroups(g, 0, level); })
+          } ,"reexpand");
+      }
+
+      function expandGroups(g, i, level) {
+        if (!(g instanceof go.Group)) return;
+        g.isSubGraphExpanded = i < level;
+        g.memberParts.each(function(m) {
+            expandGroups(m, i + 1, level);
+        })
+      }
+
+      var slider = document.getElementById("levelSlider");
+      slider.addEventListener('change', reexpand);
+      slider.addEventListener('input', reexpand);
+
+      // Show the primary selection's data, or blanks if no Part is selected:
+      var inspector = new Inspector('myInspectorDiv', myDiagram,
+        {
+          // allows for multiple nodes to be inspected at once
+          multipleSelection: true,
+          // max number of node properties will be shown when multiple selection is true
+          showSize: 4,
+          // when multipleSelection is true, when showAllProperties is true it takes the union of properties
+          // otherwise it takes the intersection of properties
+          showAllProperties: true,
+          // uncomment this line to only inspect the named properties below instead of all properties on each object:
+          // includesOwnProperties: false,
+          properties: {
+            "text": {},
+            // key would be automatically added for nodes, but we want to declare it read-only also:
+            //MUTE => "key": { readOnly: true, show: Inspector.showIfPresent },
+            // color would be automatically added for nodes, but we want to declare it a color also:
+            "color": { show: Inspector.showIfPresent, type: 'color' },
+            // Comments and LinkComments are not in any node or link data (yet), so we add them here:
+            "Comments": { show: Inspector.showIfNode },
+            "LinkComments": { show: Inspector.showIfLink },
+            "isGroup": { readOnly: true, show: Inspector.showIfPresent },
+            "flag": { show: Inspector.showIfNode, type: 'checkbox' },
+            "zOrder": { show: Inspector.showIfNode },
+            "title": {
+              show: Inspector.showIfPresent,
+              type: "select",
+              choices: function(node, propName) {
+                if (Array.isArray(node.data.choices)) return node.data.choices;
+                return [true, false];
+              }
+            },
+            "horiz": {
+              show: Inspector.showIfPresent,
+              type: "select",
+              choices: function(node, propName) {
+                if (Array.isArray(node.data.choices)) return node.data.choices;
+                return [true, false, 'none'];
+              }
+            },
+            "resizable": {
+              show: Inspector.showIfNode,
+              type: "select",
+              choices: function(node, propName) {
+                if (Array.isArray(node.data.choices)) return node.data.choices;
+                return [true, false];
+              }
+            },
+            "choices": { show: false },  // must not be shown at all
+            // an example of specifying the <input> type
+            "img": {  show: Inspector.showIfNode }, 
+            "password": { show: Inspector.showIfPresent, type: 'password' }
+          }  
+        });
+
+  document.querySelector('#file-input').addEventListener('change', function(){
+    let file = document.querySelector('#file-input').files[0];
+    let reader = new FileReader();
+    reader.addEventListener('load', function(e){
+        let text = e.target.result;        
+        //LoadModelData(text);
+        myDiagram.model = go.Model.fromJson(JSON.parse(text));
+        loadDiagramProperties();  // do this after the Model.modelData has been brought into memory
+        reexpand();
+        myDiagram.isModified = false;
+        })
+    reader.readAsText(file);//event triger
+    })
+
+  document.querySelector('#load-button').addEventListener('click', function(){
+    document.querySelector('#file-input').click()
+  }) //for address for input:file button appealance can't change issue
+
+  document.querySelector('#save-button').addEventListener('click', function(){
+    let d = new Date();
+    let date = `${d.getFullYear()}${d.getMonth()}${d.getDate()}${d.getHours()}${d.getMinutes()}${d.getSeconds()}`;
+    let docname = document.querySelector("#file-name").value;
+    let filename = `${docname}_${date}.json`;
+    let model = myDiagram.model.toJson();
+    if (docname=="") return;
+    saveDataAsJson(filename, model);
+  })
+//    load();  // GOJS default load
+  }
+
+  function saveDiagramProperties() {
+    myDiagram.model.modelData.position = go.Point.stringify(myDiagram.position);
+  }
+
+  function loadDiagramProperties(e) {
+    // set Diagram.initialPosition, not Diagram.position, to handle initialization side-effects
+    var pos = myDiagram.model.modelData.position;
+    if (pos) myDiagram.initialPosition = go.Point.parse(pos);
+  }
+ 
+  window.addEventListener("paste", function(e){
+    // Handle the event
+    retrieveImageFromClipboardAsBase64(e, function(imageDataBase64){
+        // If there's an image, open it in the browser as a new window :)
+        if(imageDataBase64){
+            // data:image/png;base64,iVBORw0KGgoAAAAN......
+            document.querySelector("#blob-output").value = imageDataBase64;
+            console.log(imageDataBase64);
+            }
+    });
+    }, false);
+
+    // Show the diagram's model in JSON format
+    function save() {
+        document.getElementById("mySavedModel").value = myDiagram.model.toJson();
+        myDiagram.isModified = false;
+    }
+    function load() {
+        myDiagram.model = go.Model.fromJson(document.getElementById("mySavedModel").value);
+        myDiagram.delayInitialization(relayoutDiagram);
+    }
+
+  window.addEventListener('DOMContentLoaded', init);
+
+  </script>
+</div>
+
+<div id="sample">
+
+    <div id="btm-menu-bar">
+        <input type="text" name="file-name" id="file-name">
+        <input type="file" id="file-input" style="display: none;">
+        <button id="load-button" class="btn">load file</button>
+        <button id="save-button" class="btn">save file</button>
+    </div>
+
+    <div style="width: 100%; display: flex; justify-content: space-between">
+        <div id="myPaletteDiv" style="width: 100px; margin-right: 2px; background-color: whitesmoke; border: 1px solid black; position: relative; -webkit-tap-highlight-color: rgba(255, 255, 255, 0); cursor: auto;"><canvas tabindex="0" width="68" height="396" style="position: absolute; top: 0px; left: 0px; z-index: 2; user-select: none; width: 102px; height: 594px;">This text is displayed if your browser does not support the Canvas HTML element.</canvas><div style="position: absolute; overflow: auto; width: 102px; height: 617px; z-index: 1;"><div style="position: absolute; width: 173.775px; height: 1px;"></div></div></div>
+        <div id="myDiagramDiv" style="flex-grow: 1; height: 620px; border: 1px solid black; position: relative; -webkit-tap-highlight-color: rgba(255, 255, 255, 0); cursor: auto; font: 10pt helvetica, arial, sans-serif;"><canvas tabindex="0" width="696" height="396" style="position: absolute; top: 0px; left: 0px; z-index: 2; user-select: none; width: 1044px; height: 594px; cursor: auto;">This text is displayed if your browser does not support the Canvas HTML element.</canvas><div style="position: absolute; overflow: auto; width: 1067px; height: 617px; z-index: 1;"><div style="position: absolute; width: 1094.41px; height: 881.063px;"></div></div></div>
+    </div>
+
+    <span style="display: inline-block; vertical-align: top;">
+        Selected Part:<br>
+        <div id="myInspectorDiv" class="inspector"><table><tbody><tr><td>text</td><td><input type="undefined" tabindex="0"></td></tr><tr><td>LinkComments</td><td><input type="undefined" tabindex="1"></td></tr><tr><td>from</td><td><input tabindex="2"></td></tr><tr><td>to</td><td><input tabindex="3"></td></tr><tr><td>fromPort</td><td><input tabindex="4"></td></tr><tr><td>toPort</td><td><input tabindex="5"></td></tr><tr><td>points</td><td><input tabindex="6"></td></tr></tbody></table></div>
+    </span>
+
+    <input id="levelSlider" type="range" min="0" max="5" value="0">
+    <button onclick="relayoutNodes()">Layout</button>
+    
+    <div>
+        <button id="SaveButton" onclick="save()">Save</button>
+        <button onclick="load()">Load</button>
+        Diagram Model saved in JSON format:
+    </div>
+
+    <input type="text" name="blob-output" id="blob-output">
+
+    <div>
+        <textarea id="mySavedModel" style="width:100%;height:300px">
+            {"class": "GraphLinksModel",
+            "nodeDataArray": [],
+            "linkDataArray": []}
+        </textarea>
+    </div>
+
+</div>
+
+
+<div id="external">
+<!-- style: Main -->
+<style>
+    /*! tailwindcss v2.0.3 | MIT License | https://tailwindcss.com *//*! modern-normalize v1.0.0 | MIT License | https://github.com/sindresorhus/modern-normalize */*,::after,::before{box-sizing:border-box}:root{-moz-tab-size:4;-o-tab-size:4;tab-size:4}html{line-height:1.15;-webkit-text-size-adjust:100%}body{margin:0}body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji'}hr{height:0;color:inherit}abbr[title]{-webkit-text-decoration:underline dotted;text-decoration:underline dotted}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit}button,input,optgroup,select,textarea{font-family:inherit;font-size:100%;line-height:1.15;margin:0}button,select{text-transform:none}[type=button],[type=reset],[type=submit],button{-webkit-appearance:button}legend{padding:0}progress{vertical-align:baseline}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}button{background-color:transparent;background-image:none}button:focus{outline:1px dotted;outline:5px auto -webkit-focus-ring-color}fieldset{margin:0;padding:0}ol,ul{list-style:none;margin:0;padding:0}html{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";line-height:1.5}body{font-family:inherit;line-height:inherit}*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}hr{border-top-width:1px}img{border-style:solid}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input:-ms-input-placeholder,textarea:-ms-input-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}table{border-collapse:collapse}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}button,input,optgroup,select,textarea{padding:0;line-height:inherit;color:inherit}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}html{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen,Ubuntu,Cantarell,Fira Sans,Droid Sans,Helvetica Neue,sans-serif}body{font-size:.875rem;line-height:1.25rem;line-height:1.5;letter-spacing:0}img{aspect-ratio:attr(width)/attr(height)}.box{margin:1rem;padding:1rem}.bg-danger{--tw-bg-opacity:1;background-color:rgba(254,226,226,var(--tw-bg-opacity))}.bg-info{--tw-bg-opacity:1;background-color:rgba(254,243,199,var(--tw-bg-opacity))}.diagramStyling{--tw-bg-opacity:1;background-color:rgba(229,231,235,var(--tw-bg-opacity))}h1{font-weight:700;font-size:2.25rem;line-height:2.5rem;line-height:1;margin-bottom:.75rem}h2{font-weight:700;font-size:1.875rem;line-height:2.25rem;line-height:1;margin-bottom:.75rem}h3{font-weight:600;font-size:1.5rem;line-height:2rem;line-height:1;margin-bottom:.75rem}h4{font-weight:600;font-size:1.25rem;line-height:1.75rem;line-height:1;margin-bottom:.75rem}a{--tw-text-opacity:1;color:rgba(3,102,214,var(--tw-text-opacity));text-decoration:none;transition-property:background-color,border-color,color,fill,stroke;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:150ms;transition-duration:.2s}a:hover{--tw-text-opacity:1;color:rgba(31,73,99,var(--tw-text-opacity));box-shadow:0 -1px 0 0 #fff inset,0 -2px 0 0 rgba(31,73,99,.45) inset}.button a,.sidebar-nav a,.topnav-link a{--tw-text-opacity:1;color:rgba(98,127,145,var(--tw-text-opacity))}.button a:hover,.sidebar-nav a:hover,.topnav-link a:hover{box-shadow:inherit}footer a{--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity));box-shadow:0 -1px 0 0 rgba(255,255,255,.35) inset,0 -2px 0 0 rgba(31,73,99,.45) inset}footer a:hover{--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity))}ol,p,ul{padding-bottom:.75rem}ol,ul{list-style-position:inside;list-style-type:disc;padding-left:1rem;padding-right:1rem}input,textarea{--tw-border-opacity:1;border-color:rgba(75,85,99,var(--tw-border-opacity));border-radius:.125rem;border-width:1px;padding:.5rem}select{--tw-border-opacity:1;border-color:rgba(75,85,99,var(--tw-border-opacity));border-radius:.125rem;border-width:1px}pre{background:#272822;padding:1em;margin:.5em 0;overflow:auto;border-radius:.3em;color:#fff}code[class*=lang],pre[class*=lang],pre[class*=lang] code{background:#272822;color:#d4d4d4;font-size:13px;text-shadow:none;font-family:Menlo,Monaco,Consolas,"Andale Mono","Ubuntu Mono","Courier New",monospace;direction:ltr;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;line-height:1.5;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-hyphens:none;-ms-hyphens:none;hyphens:none}code{--tw-bg-opacity:1;background-color:rgba(229,231,235,var(--tw-bg-opacity));border-radius:.125rem;padding-left:.25rem;padding-right:.25rem}canvas:focus{outline:2px solid transparent;outline-offset:2px}.button,button{--tw-bg-opacity:1;background-color:rgba(31,73,99,var(--tw-bg-opacity));border-radius:.25rem;display:inline-block;margin:.25rem;padding-top:.25rem;padding-bottom:.25rem;padding-left:.5rem;padding-right:.5rem;--tw-shadow:0 1px 2px 0 rgba(0, 0, 0, 0.05);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow);--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity))}.button:hover,button:hover{--tw-bg-opacity:1;background-color:rgba(98,127,145,var(--tw-bg-opacity));--tw-shadow:0 1px 2px 0 rgba(0, 0, 0, 0.05);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow);--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity));transition-property:background-color,border-color,color,fill,stroke;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:150ms;transition-duration:.2s}.bigger{font-weight:700;margin-top:.5rem;margin-bottom:.5rem;padding-top:1rem;padding-bottom:1rem;padding-left:1rem;padding-right:1rem}.sidebar-nav>a{border-radius:.5rem;display:block;font-weight:600;padding-top:.25rem;padding-bottom:.25rem;padding-left:1rem;padding-right:1rem}.sidebar-nav>a:hover{--tw-bg-opacity:1;background-color:rgba(31,73,99,var(--tw-bg-opacity));--tw-text-opacity:1;color:rgba(243,244,246,var(--tw-text-opacity))}.topnav-link{border-radius:.5rem;padding-top:.5rem;padding-bottom:.5rem;padding-left:.5rem;padding-right:.5rem;--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity))}.topnav-link:hover{--tw-bg-opacity:1;background-color:rgba(98,127,145,var(--tw-bg-opacity));--tw-shadow:0 0 #0000;box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow);--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity))}.sample-item{margin-top:.5rem;margin-bottom:.5rem;padding-left:.5rem;padding-right:.5rem;width:15rem}.sample-item-inner{--tw-bg-opacity:1;background-color:rgba(249,250,251,var(--tw-bg-opacity));border-radius:.5rem;height:100%;overflow:hidden;--tw-shadow:0 10px 15px -3px rgba(0, 0, 0, 0.1),0 4px 6px -2px rgba(0, 0, 0, 0.05);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.sample-item-inner h2{font-size:1.125rem;line-height:1.75rem;padding-top:.5rem;padding-left:1rem}.sample-item-inner p{justify-content:space-between;line-height:1.25;padding:.5rem}.sample-item img{display:block;height:auto;width:100%}.feature-grid div{--tw-border-opacity:1;border-color:rgba(229,231,235,var(--tw-border-opacity));border-top-width:1px;margin-top:2rem;padding-top:2rem}.feature-grid:nth-child(n)>:first-child,.feature-grid:nth-child(n)>:nth-child(2){border-top-width:0;margin-top:0;padding-top:0}@media (min-width:1024px){.feature-grid:nth-child(n)>:nth-child(3){border-top-width:0;margin-top:0;padding-top:0}}.container{width:100%}@media (min-width:640px){.container{max-width:640px}}@media (min-width:768px){.container{max-width:768px}}@media (min-width:1024px){.container{max-width:1024px}}@media (min-width:1280px){.container{max-width:1280px}}@media (min-width:1536px){.container{max-width:1536px}}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.bg-white{--tw-bg-opacity:1;background-color:rgba(255,255,255,var(--tw-bg-opacity))}.bg-nwoods-primary{--tw-bg-opacity:1;background-color:rgba(31,73,99,var(--tw-bg-opacity))}.bg-nwoods-secondary{--tw-bg-opacity:1;background-color:rgba(98,127,145,var(--tw-bg-opacity))}.hover\:bg-nwoods-secondary:hover{--tw-bg-opacity:1;background-color:rgba(98,127,145,var(--tw-bg-opacity))}.border-collapse{border-collapse:collapse}.border-gray-600{--tw-border-opacity:1;border-color:rgba(75,85,99,var(--tw-border-opacity))}.rounded{border-radius:.25rem}.rounded-lg{border-radius:.5rem}.rounded-xl{border-radius:.75rem}.border{border-width:1px}.border-t{border-top-width:1px}.border-b{border-bottom-width:1px}.block{display:block}.inline-block{display:inline-block}.inline{display:inline}.flex{display:flex}.table{display:table}.grid{display:grid}.contents{display:contents}.hidden{display:none}.flex-col{flex-direction:column}.flex-col-reverse{flex-direction:column-reverse}.flex-wrap{flex-wrap:wrap}.items-start{align-items:flex-start}.items-center{align-items:center}.justify-end{justify-content:flex-end}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.flex-grow{flex-grow:1}.flex-shrink-0{flex-shrink:0}.font-medium{font-weight:500}.font-semibold{font-weight:600}.font-bold{font-weight:700}.h-6{height:1.5rem}.text-xs{font-size:.75rem;line-height:1rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-base{font-size:1rem;line-height:1.5rem}.text-2xl{font-size:1.5rem;line-height:2rem}.text-5xl{font-size:3rem;line-height:1}.leading-none{line-height:1}.leading-tight{line-height:1.25}.leading-normal{line-height:1.5}.list-none{list-style-type:none}.my-0{margin-top:0;margin-bottom:0}.my-3{margin-top:.75rem;margin-bottom:.75rem}.my-4{margin-top:1rem;margin-bottom:1rem}.my-6{margin-top:1.5rem;margin-bottom:1.5rem}.mx-auto{margin-left:auto;margin-right:auto}.mt-0{margin-top:0}.mb-0{margin-bottom:0}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:.75rem}.mb-8{margin-bottom:2rem}.max-w-5xl{max-width:64rem}.max-w-screen-lg{max-width:1024px}.max-w-screen-xl{max-width:1280px}.min-h-screen{min-height:100vh}.opacity-0{opacity:0}.opacity-50{opacity:.5}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.overflow-hidden{overflow:hidden}.p-0{padding:0}.p-1{padding:.25rem}.p-2{padding:.5rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.py-0{padding-top:0;padding-bottom:0}.px-0{padding-left:0;padding-right:0}.px-1{padding-left:.25rem;padding-right:.25rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}.px-2{padding-left:.5rem;padding-right:.5rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.px-3{padding-left:.75rem;padding-right:.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.px-4{padding-left:1rem;padding-right:1rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.px-8{padding-left:2rem;padding-right:2rem}.px-12{padding-left:3rem;padding-right:3rem}.pb-0{padding-bottom:0}.pt-4{padding-top:1rem}.pb-4{padding-bottom:1rem}.pb-8{padding-bottom:2rem}.pb-14{padding-bottom:3.5rem}.pb-16{padding-bottom:4rem}.static{position:static}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.top-0{top:0}.resize{resize:both}*{--tw-shadow:0 0 #0000}.shadow{--tw-shadow:0 1px 3px 0 rgba(0, 0, 0, 0.1),0 1px 2px 0 rgba(0, 0, 0, 0.06);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-lg{--tw-shadow:0 10px 15px -3px rgba(0, 0, 0, 0.1),0 4px 6px -2px rgba(0, 0, 0, 0.05);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.hover\:shadow-none:hover{--tw-shadow:0 0 #0000;box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}*{--tw-ring-inset:var(--tw-empty, );/*!*//*!*/--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59, 130, 246, 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000}.ring{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)}.focus\:ring:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)}.text-center{text-align:center}.text-white{--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity))}.text-gray-100{--tw-text-opacity:1;color:rgba(243,244,246,var(--tw-text-opacity))}.text-gray-700{--tw-text-opacity:1;color:rgba(55,65,81,var(--tw-text-opacity))}.text-gray-800{--tw-text-opacity:1;color:rgba(31,41,55,var(--tw-text-opacity))}.text-nwoods-secondary{--tw-text-opacity:1;color:rgba(98,127,145,var(--tw-text-opacity))}.hover\:text-white:hover{--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity))}.italic{font-style:italic}.uppercase{text-transform:uppercase}.lowercase{text-transform:lowercase}.underline{text-decoration:underline}.no-underline{text-decoration:none}.hover\:no-underline:hover{text-decoration:none}.tracking-normal{letter-spacing:0}.tracking-wide{letter-spacing:.025em}.visible{visibility:visible}.invisible{visibility:hidden}.break-words{overflow-wrap:break-word}.w-6{width:1.5rem}.w-12{width:3rem}.w-64{width:16rem}.w-auto{width:auto}.w-4\/5{width:80%}.w-5\/6{width:83.333333%}.w-full{width:100%}.z-20{z-index:20}.z-30{z-index:30}.z-50{z-index:50}.gap-x-12{-moz-column-gap:3rem;column-gap:3rem}.gap-y-10{row-gap:2.5rem}.grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.row-span-2{grid-row:span 2/span 2}.transform{--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;transform:translateX(var(--tw-translate-x)) translateY(var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.transition{transition-property:background-color,border-color,color,fill,stroke,opacity,box-shadow,transform;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:150ms}@-webkit-keyframes spin{to{transform:rotate(360deg)}}@keyframes spin{to{transform:rotate(360deg)}}@-webkit-keyframes ping{100%,75%{transform:scale(2);opacity:0}}@keyframes ping{100%,75%{transform:scale(2);opacity:0}}@-webkit-keyframes pulse{50%{opacity:.5}}@keyframes pulse{50%{opacity:.5}}@-webkit-keyframes bounce{0%,100%{transform:translateY(-25%);-webkit-animation-timing-function:cubic-bezier(.8,0,1,1);animation-timing-function:cubic-bezier(.8,0,1,1)}50%{transform:none;-webkit-animation-timing-function:cubic-bezier(0,0,.2,1);animation-timing-function:cubic-bezier(0,0,.2,1)}}@keyframes bounce{0%,100%{transform:translateY(-25%);-webkit-animation-timing-function:cubic-bezier(.8,0,1,1);animation-timing-function:cubic-bezier(.8,0,1,1)}50%{transform:none;-webkit-animation-timing-function:cubic-bezier(0,0,.2,1);animation-timing-function:cubic-bezier(0,0,.2,1)}}@media (min-width:640px){.sm\:block{display:block}.sm\:hidden{display:none}.sm\:flex-row{flex-direction:row}.sm\:flex-nowrap{flex-wrap:nowrap}.sm\:p-0{padding:0}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}.sm\:pb-20{padding-bottom:5rem}.sm\:w-1\/2{width:50%}.sm\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}}@media (min-width:768px){.md\:space-y-1>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.25rem * var(--tw-space-y-reverse))}.md\:block{display:block}.md\:flex{display:flex}.md\:hidden{display:none}.md\:flex-row{flex-direction:row}.md\:mb-6{margin-bottom:1.5rem}.md\:min-h-screen{min-height:100vh}.md\:overflow-y-auto{overflow-y:auto}.md\:px-0{padding-left:0;padding-right:0}.md\:px-8{padding-left:2rem;padding-right:2rem}.md\:pb-0{padding-bottom:0}.md\:pl-4{padding-left:1rem}.md\:text-left{text-align:left}.md\:w-40{width:10rem}.md\:w-48{width:12rem}.md\:w-2\/5{width:40%}.md\:w-3\/5{width:60%}.md\:w-full{width:100%}.md\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}}@media (min-width:1024px){.lg\:text-base{font-size:1rem;line-height:1.5rem}.lg\:text-4xl{font-size:2.25rem;line-height:2.5rem}.lg\:mr-0{margin-right:0}.lg\:ml-4{margin-left:1rem}.lg\:px-0{padding-left:0;padding-right:0}.lg\:px-4{padding-left:1rem;padding-right:1rem}.lg\:w-48{width:12rem}.lg\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}}@media (min-width:1280px){.xl\:max-w-screen-xl{max-width:1280px}}
+</style>
+
+<!-- style: Inspector -->
+<style>
+
+  /*
+Default CSS for the Data inspector
+see also: DataInspector.js, DataInspector.html
+*/
+
+/*
+Grey color palette
+https://www.google.com/design/spec/style/color.html
+/*   #FAFAFA; /* Grey 50  */
+/*   #F5F5F5; /* Grey 100 */
+/*   #EEEEEE; /* Grey 200 */
+/*   #E0E0E0; /* Grey 300 */
+/*   #BDBDBD; /* Grey 400 */
+/*   #9E9E9E; /* Grey 500 */
+/*   #757575; /* Grey 600 */
+/*   #616161; /* Grey 700 */
+/*   #424242; /* Grey 800 */
+/*   #212121; /* Grey 900 */
+
+.inspector {
+display: inline-block;
+font: bold 14px helvetica, sans-serif;
+background-color: #212121; /* Grey 900 */
+color: #F5F5F5; /* Grey 100 */
+cursor: default;
+}
+
+.inspector table {
+border-collapse: separate;
+border-spacing: 2px;
+}
+
+.inspector td, th {
+padding: 2px;
+}
+
+.inspector input {
+background-color: #424242; /* Grey 800 */
+color: #F5F5F5; /* Grey 100 */
+font: bold 12px helvetica, sans-serif;
+border: 0px;
+padding: 2px;
+}
+
+.inspector input:disabled {
+background-color: #BDBDBD; /* Grey 400 */
+color: #616161; /* Grey 700 */
+}
+
+.inspector select {
+background-color: #424242;
+}
+
+</style>
+
+
+
+<!-- removed => Figures.js -->
+</div>
+
+
+
+</body></html>
