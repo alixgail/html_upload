@@ -3,9 +3,6 @@
 <html lang="en"><head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <script src="gojs_lib.js"></script>
-
-    <link rel="stylesheet" href="Regrouping Demo_files/style.css"> 
-
 <title>index</title>
 </head>
 <body>
@@ -45,10 +42,28 @@ function showTextarea() {
     (e1.style.display = 'none', e2.style.display = 'none', e3.style.display = 'none');
 }
 
+function editSideDiagram(n) {
+  var e = document.querySelector("#mySideDiagramDiv");
+    //e.style.display == 'none' ? 
+    //e.style.display = 'block' :
+    //e.style.display = 'none';
+
+    if (e.style.display == 'none') {
+      // close => open
+      e.style.display = 'block';
+      loadSideDiagram(n);
+    } else {
+      // open => close
+      e.style.display = 'none';
+      saveSideDiagram(n);
+    }
+}
+
   function init() {
     const $ = go.GraphObject.make;
-    myDiagram =
-      $(go.Diagram, "myDiagramDiv",
+
+    function makeDiagram(divname) {
+      return $(go.Diagram, divname,
         {
             // when a drag-drop occurs in the Diagram's background, make it a top-level node
             mouseDrop: function(e){finishDrop(e, null);},
@@ -77,6 +92,10 @@ function showTextarea() {
               }
             }
         });
+    }
+
+    myDiagram = makeDiagram("myDiagramDiv");
+    mySideDiagram = makeDiagram("mySideDiagramDiv");
 
     // Define a function for creating a "port" that is normally transparent.
     // The "name" is used as the GraphObject.portId, the "spot" is used to control how links connect
@@ -88,7 +107,7 @@ function showTextarea() {
         {
           fill: null,  // not seen, by default; set to a translucent gray by showSmallPorts, defined below
           stroke: null,
-          desiredSize: new go.Size(17, 17),
+          desiredSize: new go.Size(0, 0),
           alignment: spot,  // align the port on the main Shape
           alignmentFocus: spot,  // just inside the Shape
           portId: name,  // declare this object to be a "port"
@@ -99,304 +118,10 @@ function showTextarea() {
         new go.Binding("desiredSize", "linkable", function(b) {
         return b ? new go.Size(17, 17) : new go.Size(0, 0) ;
         })
-        );
+      );
     }
 
-    var nodeSelectionAdornmentTemplate =
-      $(go.Adornment, "Auto",
-        $(go.Shape, { fill: null, stroke: "deepskyblue", strokeWidth: 1.5, strokeDashArray: [4, 2] }),
-        $(go.Placeholder)
-      );
-
-    var nodeResizeAdornmentTemplate =
-      $(go.Adornment, "Spot",
-        { locationSpot: go.Spot.Right },
-        $(go.Placeholder),
-        $(go.Shape, { alignment: go.Spot.TopLeft, cursor: "nw-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
-        $(go.Shape, { alignment: go.Spot.Top, cursor: "n-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
-        $(go.Shape, { alignment: go.Spot.TopRight, cursor: "ne-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
-
-        $(go.Shape, { alignment: go.Spot.Left, cursor: "w-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
-        $(go.Shape, { alignment: go.Spot.Right, cursor: "e-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
-
-        $(go.Shape, { alignment: go.Spot.BottomLeft, cursor: "se-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
-        $(go.Shape, { alignment: go.Spot.Bottom, cursor: "s-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
-        $(go.Shape, { alignment: go.Spot.BottomRight, cursor: "sw-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" })
-      );
-
-    var nodeRotateAdornmentTemplate =
-      $(go.Adornment,
-        { locationSpot: go.Spot.Center, locationObjectName: "ELLIPSE" },
-        $(go.Shape, "Ellipse", { name: "ELLIPSE", cursor: "pointer", desiredSize: new go.Size(9, 9), fill: "lightblue", stroke: "deepskyblue" }),
-        $(go.Shape, { geometryString: "M3.5 7 L3.5 30", isGeometryPositioned: true, stroke: "deepskyblue", strokeWidth: 1.5, strokeDashArray: [4, 2] })
-      );
-
-
-    myDiagram.nodeTemplateMap.add("",
-    $(go.Node, "Spot",
-        { locationSpot: go.Spot.Center },
-         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
-        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
-
-/*　↓ now edit ↓ */
-
-        new go.Binding("zOrder", "z-order").makeTwoWay(),
-
-/*　↑ now edit ↑ */
-
-        //new go.Binding("angle").makeTwoWay(),
-        // the main object is a Panel that surrounds a TextBlock with a Shape
-        $(go.Panel, "Auto",
-          { name: "PANEL" },
-          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
-          $(go.Shape, "Rectangle",  // default figure
-            {
-              portId: "", // the default port: if no spot on link data, use closest side
-              fill: "white",  // default color
-            },
-            new go.Binding("figure"),
-            new go.Binding("fill")),
-          $(go.TextBlock,
-            {
-              textAlign: "center",
-              font: "bold 11pt Helvetica, Arial, sans-serif",
-              margin: 5,
-              maxSize: new go.Size(NaN, NaN),
-              wrap: go.TextBlock.WrapFit,
-              editable: true
-            },
-            new go.Binding("text").makeTwoWay()),
-          $(go.Picture,
-          {},
-          new go.Binding("source", "img").makeTwoWay(),
-          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify)),
-          $(go.Shape, "Rectangle",  // default figure
-            {
-              fill: null,
-              fromLinkable: true, toLinkable: true, cursor: "pointer",
-              strokeWidth: 2
-            },
-            new go.Binding("fromLinkable", "linkable"),
-            new go.Binding("toLinkable", "linkable"),
-            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify))
-        ),
-        // four small named ports, one on each side:
-        makePort("T", go.Spot.Top, true, true),
-        makePort("L", go.Spot.Left, true, true),
-        makePort("R", go.Spot.Right, true, true),
-        makePort("B", go.Spot.Bottom, true, true),
-        { // handle mouse enter/leave events to show/hide the ports
-          mouseEnter: (e, node) => showSmallPorts(node, true),
-          mouseLeave: (e, node) => showSmallPorts(node, false)
-        }));
-
-
-    myDiagram.nodeTemplateMap.add("IMAGE",
-    $(go.Node, "Spot",
-        { locationSpot: go.Spot.Center },
-         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
-        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
-        { doubleClick: function(e, node) { showImage(node.data.img); } },
-/*　↓ now edit ↓ */
-
-        new go.Binding("zOrder", "z-order").makeTwoWay(),
-
-/*　↑ now edit ↑ */
-
-
-        //new go.Binding("angle").makeTwoWay(),
-        // the main object is a Panel that surrounds a TextBlock with a Shape
-        $(go.Panel, "Auto",
-          { name: "PANEL",
-          desiredSize: new go.Size(90, 60)},
-          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
-          $(go.Shape, "Rectangle",  // default figure
-            {
-              portId: "", // the default port: if no spot on link data, use closest side
-              fill: "white",  // default color
-            },
-            new go.Binding("figure"),
-            new go.Binding("fill")),
-          $(go.TextBlock,
-            {
-              textAlign: "center",
-              font: "bold 11pt Helvetica, Arial, sans-serif",
-              margin: 5,
-              maxSize: new go.Size(NaN, NaN),
-              wrap: go.TextBlock.WrapFit,
-              editable: true
-            },
-            new go.Binding("text").makeTwoWay()),
-          $(go.Picture,
-          {},
-          new go.Binding("source", "img").makeTwoWay(),
-          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify)),
-          $(go.Shape, "Rectangle",  // default figure
-            {
-              fill: null,
-              fromLinkable: true, toLinkable: true, cursor: "pointer",
-              strokeWidth: 2
-            },
-            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify))
-        ),
-        // four small named ports, one on each side:
-        makePort("T", go.Spot.Top, true, true),
-        makePort("L", go.Spot.Left, true, true),
-        makePort("R", go.Spot.Right, true, true),
-        makePort("B", go.Spot.Bottom, true, true),
-        { // handle mouse enter/leave events to show/hide the ports
-          mouseEnter: (e, node) => showSmallPorts(node, true),
-          mouseLeave: (e, node) => showSmallPorts(node, false)
-        }));
-
-
-    myDiagram.nodeTemplateMap.add("LABEL",
-    $(go.Node, "Spot",
-        { locationSpot: go.Spot.Center },
-         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
-        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
-
-/*　↓ now edit ↓ */
-
-        new go.Binding("zOrder", "z-order").makeTwoWay(),
-
-/*　↑ now edit ↑ */
-
-
-        //new go.Binding("angle").makeTwoWay(),
-        // the main object is a Panel that surrounds a TextBlock with a Shape
-        $(go.Panel, "Auto",
-          { name: "PANEL", 
-            desiredSize: new go.Size(90, 30)},
-          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
-          $(go.Shape, "Rectangle",  // default figure
-            {
-              portId: "", // the default port: if no spot on link data, use closest side
-              fill: "white",  // default color
-            },
-            new go.Binding("figure"),
-            new go.Binding("fill")),
-          $(go.TextBlock,
-            {
-              textAlign: "center",
-              font: "bold 11pt Helvetica, Arial, sans-serif",
-              margin: 5,
-              maxSize: new go.Size(NaN, NaN),
-              wrap: go.TextBlock.WrapFit,
-              editable: true
-            },
-            new go.Binding("text").makeTwoWay())
-        ),
-        // four small named ports, one on each side:
-        makePort("T", go.Spot.Top, true, true),
-        makePort("L", go.Spot.Left, true, true),
-        makePort("R", go.Spot.Right, true, true),
-        makePort("B", go.Spot.Bottom, true, true),
-        { // handle mouse enter/leave events to show/hide the ports
-          mouseEnter: (e, node) => showSmallPorts(node, true),
-          mouseLeave: (e, node) => showSmallPorts(node, false)
-        }));
-
-
-    myDiagram.nodeTemplateMap.add("FILL",
-    $(go.Node, "Spot",
-        { locationSpot: go.Spot.Center },
-         new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
-        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
-
-/*　↓ now edit ↓ */
-
-        new go.Binding("zOrder", "z-order").makeTwoWay(),
-
-/*　↑ now edit ↑ */
-
-        //new go.Binding("angle").makeTwoWay(),
-        // the main object is a Panel that surrounds a TextBlock with a Shape
-        $(go.Panel, "Auto",
-          { name: "PANEL" ,
-          desiredSize: new go.Size(90, 30)},
-          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
-          $(go.Shape, "Rectangle",  // default figure
-            {
-              portId: "", // the default port: if no spot on link data, use closest side
-              fill: "rgba(255,0,0,0.6)",  // default color
-              stroke: null
-            },
-            new go.Binding("figure"),
-            new go.Binding("fill")),
-          $(go.TextBlock,
-            {
-              textAlign: "center",
-              font: "11pt Helvetica, Arial, sans-serif",
-              stroke: "red",
-              margin: 5,
-              maxSize: new go.Size(NaN, NaN),
-              wrap: go.TextBlock.WrapFit,
-              editable: true
-            },
-            new go.Binding("text").makeTwoWay())
-        ),
-        // four small named ports, one on each side:
-        makePort("T", go.Spot.Top, true, true),
-        makePort("L", go.Spot.Left, true, true),
-        makePort("R", go.Spot.Right, true, true),
-        makePort("B", go.Spot.Bottom, true, true),
-        { // handle mouse enter/leave events to show/hide the ports
-          mouseEnter: (e, node) => showSmallPorts(node, true),
-          mouseLeave: (e, node) => showSmallPorts(node, false)
-        }));
-
-        
-    myDiagram.nodeTemplateMap.add("PIN",
-    $(go.Node, "Spot",
-        { locationSpot: go.Spot.Center },
-        { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
-        { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
-        new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-        new go.Binding("resizable", "resizable"),
-        // the main object is a Panel that surrounds a TextBlock with a Shape
-        $(go.Panel, "Auto",
-        { name: "PANEL" },
-        { desiredSize: new go.Size.parse("20 20") },
-        new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
-      //    new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
-          $(go.Shape, "Circle",  // default figure
-            {
-             portId: "", // the default port: if no spot on link data, use closest side
-             strokeWidth: 0,
-             fill: "rgba(255,0,0,0.6)",  // default color
-            },
-            new go.Binding("fill")  
-            )),
-            $(go.TextBlock,
-              {
-                textAlign: "center",
-                font: "bold 11pt Helvetica, Arial, sans-serif",
-                margin: 5,
-                stroke: "rgba(0,0,0,1)",
-                maxSize: new go.Size(NaN, NaN),
-                wrap: go.TextBlock.WrapFit,
-                editable: true
-              },
-              new go.Binding("desiredSize", "showcomment", function(b) {return b ? new go.Size(NaN, NaN) : new go.Size(0,0) }),
-              new go.Binding("text", "text") 
-              ),
-        // four small named ports, one on each side:
-        makePort("T", go.Spot.Top, true, true),
-        makePort("L", go.Spot.Left, true, true),
-        makePort("R", go.Spot.Right, true, true),
-        makePort("B", go.Spot.Bottom, true, true),
-        { // handle mouse enter/leave events to show/hide the ports
-          mouseEnter: (e, node) => showSmallPorts(node, true),
-          mouseLeave: (e, node) => showSmallPorts(node, false)
-        }));
-        
-        
-//  myDiagram.select(myDiagram.nodes.first());
+    //  myDiagram.select(myDiagram.nodes.first());
     function showSmallPorts(node, show) {
       node.ports.each(port => {
         if (port.portId !== "") {  // don't change the default port, which is the big shape
@@ -404,47 +129,6 @@ function showTextarea() {
         }
       });
     }
-
-    var linkSelectionAdornmentTemplate =
-      $(go.Adornment, "Link",
-        $(go.Shape,
-          // isPanelMain declares that this Shape shares the Link.geometry
-          { isPanelMain: true, fill: null, stroke: "deepskyblue", strokeWidth: 0 })  // use selection object's strokeWidth
-      );
-
-    myDiagram.linkTemplateMap.add("",
-      $(go.Link,  // the whole link panel
-        { selectable: true, selectionAdornmentTemplate: linkSelectionAdornmentTemplate },
-        { relinkableFrom: true, relinkableTo: true, reshapable: true },
-        {
-          routing: go.Link.Orthogonal,
-          curve: go.Link.JumpOver,
-          corner: 5,
-          toShortLength: 4
-        },
-        new go.Binding("routing", "routing"),
-        new go.Binding("points").makeTwoWay(),
-        $(go.Shape,  // the link path shape
-          { isPanelMain: true, strokeWidth: 1 }),
-        $(go.Shape,  // the arrowhead
-          { toArrow: "Standard", stroke: null }),
-        $(go.Panel, "Auto",
-          new go.Binding("visible", "isSelected").ofObject(),
-          $(go.Shape, "RoundedRectangle",  // the link shape
-            { fill: "#F8F8F8", stroke: null }),
-          $(go.TextBlock,
-            {
-              textAlign: "center",
-              font: "10pt helvetica, arial, sans-serif",
-              stroke: "#919191",
-              margin: 2,
-              minSize: new go.Size(10, NaN),
-              editable: true
-            },
-            new go.Binding("text").makeTwoWay())
-        )
-      ));
-
 
     // The one template for Groups can be configured to be either layout out its members
     // horizontally or vertically, each with a different default color.
@@ -492,7 +176,7 @@ function showTextarea() {
     }
 
     function groupFont() {  // a Binding conversion function
-      return "bold 16px sans-serif";
+      return "16px sans-serif";
       //horiz ? "bold 18px sans-serif" : "bold 16px sans-serif";
     }
 
@@ -514,129 +198,474 @@ function showTextarea() {
         grp.isHighlighted = false;
     }
 
+    function setTemplate(d) {
+      var nodeSelectionAdornmentTemplate =
+        $(go.Adornment, "Auto",
+          $(go.Shape, { fill: null, stroke: "deepskyblue", strokeWidth: 1.5, strokeDashArray: [4, 2] }),
+          $(go.Placeholder)
+        );
 
-    myDiagram.groupTemplateMap.add("",
-      $(go.Group, "Auto",
-      {
-        background: "white",
-        ungroupable: true,
-        // highlight when dragging into the Group
-        mouseDragEnter: function(e, grp, prev) { highlightGroup(e, grp, true); },
-        mouseDragLeave: function(e, grp, next) { highlightGroup(e, grp, false); },
-        computesBoundsAfterDrag: true,
-        // when the selection is dropped into a Group, add the selected Parts into that Group;
-        // if it fails, cancel the tool, rolling back any changes
-        mouseDrop: finishDrop,
-        handlesDragDropForMembers: true,  // don't need to define handlers on member Nodes and Links
-        // Groups containing Groups lay out their members horizontally
-        layout: makeLayout(false) //makeLayout() => go.GridLayout obj
-      },
-      //below is header section
-      new go.Binding("layout", "horiz", makeLayout),
-      new go.Binding("background", "isHighlighted", function(h) {
-        return h ? "rgba(255,0,0,0.2)" : "white";
-      }).ofObject(),
-      $(go.Shape, "Rectangle",
-        { fill: "rgba(255,255,255,255,20)", stroke: groupColor(), strokeWidth: 2 },
-        //new go.Binding("stroke", "horiz", groupColor),
-        new go.Binding("stroke", "fill")),
-      $(go.Panel, "Vertical",  // title above Placeholder
-        $(go.Panel, "Horizontal",  // button next to TextBlock
-          { desiredSize: new go.Size(NaN, NaN) , stretch: go.GraphObject.Horizontal, background: groupColor() },
-          new go.Binding("desiredSize", "title", function(t) {
-        return t ? new go.Size(NaN, 35) : new go.Size(NaN, 0);
-      }),
-          //new go.Binding("background", "horiz", groupColor),
-          new go.Binding("background", "fill"),
-         $("SubGraphExpanderButton",
-            { alignment: go.Spot.Right, margin: 10 }),
+      var nodeResizeAdornmentTemplate =
+        $(go.Adornment, "Spot",
+          { locationSpot: go.Spot.Right },
+          $(go.Placeholder),
+          $(go.Shape, { alignment: go.Spot.TopLeft, cursor: "nw-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+          $(go.Shape, { alignment: go.Spot.Top, cursor: "n-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+          $(go.Shape, { alignment: go.Spot.TopRight, cursor: "ne-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+
+          $(go.Shape, { alignment: go.Spot.Left, cursor: "w-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+          $(go.Shape, { alignment: go.Spot.Right, cursor: "e-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+
+          $(go.Shape, { alignment: go.Spot.BottomLeft, cursor: "se-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+          $(go.Shape, { alignment: go.Spot.Bottom, cursor: "s-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" }),
+          $(go.Shape, { alignment: go.Spot.BottomRight, cursor: "sw-resize", desiredSize: new go.Size(8, 8), fill: "lightblue", stroke: "deepskyblue" })
+        );
+
+      var nodeRotateAdornmentTemplate =
+        $(go.Adornment,
+          { locationSpot: go.Spot.Center, locationObjectName: "ELLIPSE" },
+          $(go.Shape, "Ellipse", { name: "ELLIPSE", cursor: "pointer", desiredSize: new go.Size(9, 9), fill: "lightblue", stroke: "deepskyblue" }),
+          $(go.Shape, { geometryString: "M3.5 7 L3.5 30", isGeometryPositioned: true, stroke: "deepskyblue", strokeWidth: 1.5, strokeDashArray: [4, 2] })
+        );
+
+      d.nodeTemplateMap.add("",
+      $(go.Node, "Spot",
+          { locationSpot: go.Spot.Center },
+          new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+          { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+          { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+          //new go.Binding("angle").makeTwoWay(),
+          // the main object is a Panel that surrounds a TextBlock with a Shape
+          $(go.Panel, "Auto",
+            { name: "PANEL" },
+            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+            $(go.Shape, "Rectangle",  // default figure
+              {
+                portId: "", // the default port: if no spot on link data, use closest side
+                fill: "white",  // default color
+              },
+              new go.Binding("figure"),
+              new go.Binding("fill")),
+            $(go.TextBlock,
+              {
+                textAlign: "center",
+                font: "bold 11pt Helvetica, Arial, sans-serif",
+                margin: 5,
+                maxSize: new go.Size(NaN, NaN),
+                wrap: go.TextBlock.WrapFit,
+                editable: true
+              },
+              new go.Binding("text").makeTwoWay()),
+            $(go.Picture,
+            {},
+            new go.Binding("source", "img").makeTwoWay(),
+            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify)),
+            $(go.Shape, "Rectangle",  // default figure
+              {
+                fill: null,
+                fromLinkable: true, toLinkable: true, cursor: "pointer",
+                strokeWidth: 2
+              },
+              new go.Binding("fromLinkable", "linkable"),
+              new go.Binding("toLinkable", "linkable"),
+              new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify))
+          ),
+          // four small named ports, one on each side:
+          makePort("T", go.Spot.Top, true, true),
+          makePort("L", go.Spot.Left, true, true),
+          makePort("R", go.Spot.Right, true, true),
+          makePort("B", go.Spot.Bottom, true, true),
+          { // handle mouse enter/leave events to show/hide the ports
+            mouseEnter: (e, node) => showSmallPorts(node, true),
+            mouseLeave: (e, node) => showSmallPorts(node, false)
+          }));
+
+      d.nodeTemplateMap.add("IMAGE",
+      $(go.Node, "Spot",
+          { locationSpot: go.Spot.Center },
+          new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+          { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+          { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+          { doubleClick: function(e, node) { showImage(node.data.img); } },
+          //new go.Binding("angle").makeTwoWay(),
+          // the main object is a Panel that surrounds a TextBlock with a Shape
+          $(go.Panel, "Auto",
+            { name: "PANEL",
+            desiredSize: new go.Size(90, 60)},
+            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+            $(go.Shape, "Rectangle",  // default figure
+              {
+                portId: "", // the default port: if no spot on link data, use closest side
+                fill: "white",  // default color
+              },
+              new go.Binding("figure"),
+              new go.Binding("fill")),
+            $(go.TextBlock,
+              {
+                textAlign: "center",
+                font: "11pt Helvetica, Arial, sans-serif",
+                margin: 5,
+                maxSize: new go.Size(NaN, NaN),
+                wrap: go.TextBlock.WrapFit,
+                editable: true
+              },
+              new go.Binding("text").makeTwoWay()),
+            $(go.Picture,
+            {},
+            new go.Binding("source", "img").makeTwoWay(),
+            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify)),
+            $(go.Shape, "Rectangle",  // default figure
+              {
+                fill: null,
+                fromLinkable: true, toLinkable: true, cursor: "pointer",
+                strokeWidth: 2
+              },
+              new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify))
+          ),
+          // four small named ports, one on each side:
+          makePort("T", go.Spot.Top, true, true),
+          makePort("L", go.Spot.Left, true, true),
+          makePort("R", go.Spot.Right, true, true),
+          makePort("B", go.Spot.Bottom, true, true),
+          { // handle mouse enter/leave events to show/hide the ports
+            mouseEnter: (e, node) => showSmallPorts(node, true),
+            mouseLeave: (e, node) => showSmallPorts(node, false)
+          }));
+
+      d.nodeTemplateMap.add("LABEL",
+      $(go.Node, "Spot",
+          { locationSpot: go.Spot.Center },
+          new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+          { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+          { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+          //new go.Binding("angle").makeTwoWay(),
+          // the main object is a Panel that surrounds a TextBlock with a Shape
+          $(go.Panel, "Auto",
+            { name: "PANEL", 
+              desiredSize: new go.Size(90, 30)},
+            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+            $(go.Shape, "Rectangle",  // default figure
+              {
+                portId: "", // the default port: if no spot on link data, use closest side
+                fill: "white",  // default color
+              },
+              new go.Binding("figure"),
+              new go.Binding("fill")),
+            $(go.TextBlock,
+              {
+                textAlign: "center",
+                font: "11pt Helvetica, Arial, sans-serif",
+                margin: 5,
+                maxSize: new go.Size(NaN, NaN),
+                wrap: go.TextBlock.WrapFit,
+                editable: true
+              },
+              new go.Binding("text").makeTwoWay())
+          ),
+          // four small named ports, one on each side:
+          makePort("T", go.Spot.Top, true, true),
+          makePort("L", go.Spot.Left, true, true),
+          makePort("R", go.Spot.Right, true, true),
+          makePort("B", go.Spot.Bottom, true, true),
+          { // handle mouse enter/leave events to show/hide the ports
+            mouseEnter: (e, node) => showSmallPorts(node, true),
+            mouseLeave: (e, node) => showSmallPorts(node, false)
+          }));
+
+      d.nodeTemplateMap.add("FILL",
+      $(go.Node, "Spot",
+          { locationSpot: go.Spot.Center },
+          new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+          { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+          { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+          //new go.Binding("angle").makeTwoWay(),
+          // the main object is a Panel that surrounds a TextBlock with a Shape
+          $(go.Panel, "Auto",
+            { name: "PANEL" ,
+            desiredSize: new go.Size(90, 30)},
+            new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+            $(go.Shape, "Rectangle",  // default figure
+              {
+                portId: "", // the default port: if no spot on link data, use closest side
+                fill: "rgba(255,0,0,0.6)",  // default color
+                stroke: null
+              },
+              new go.Binding("figure"),
+              new go.Binding("fill")),
+            $(go.TextBlock,
+              {
+                textAlign: "center",
+                font: "11pt Helvetica, Arial, sans-serif",
+                stroke: "red",
+                margin: 5,
+                maxSize: new go.Size(NaN, NaN),
+                wrap: go.TextBlock.WrapFit,
+                editable: true
+              },
+              new go.Binding("text").makeTwoWay())
+          ),
+          // four small named ports, one on each side:
+          makePort("T", go.Spot.Top, true, true),
+          makePort("L", go.Spot.Left, true, true),
+          makePort("R", go.Spot.Right, true, true),
+          makePort("B", go.Spot.Bottom, true, true),
+          { // handle mouse enter/leave events to show/hide the ports
+            mouseEnter: (e, node) => showSmallPorts(node, true),
+            mouseLeave: (e, node) => showSmallPorts(node, false)
+          }));
+          
+      d.nodeTemplateMap.add("PIN",
+      $(go.Node, "Spot",
+          { locationSpot: go.Spot.Center },
+          { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+          { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+          new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+          new go.Binding("resizable", "resizable"),
+          // the main object is a Panel that surrounds a TextBlock with a Shape
+          $(go.Panel, "Auto",
+          { name: "PANEL" },
+          { desiredSize: new go.Size.parse("20 20") },
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+        //    new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+            $(go.Shape, "Circle",  // default figure
+              {
+              portId: "", // the default port: if no spot on link data, use closest side
+              strokeWidth: 0,
+              fill: "rgba(255,0,0,0.6)",  // default color
+              },
+              new go.Binding("fill")  
+              )),
+              $(go.TextBlock,
+                {
+                  textAlign: "center",
+                  font: "bold 11pt Helvetica, Arial, sans-serif",
+                  margin: 5,
+                  stroke: "rgba(0,0,0,1)",
+                  maxSize: new go.Size(NaN, NaN),
+                  wrap: go.TextBlock.WrapFit,
+                  editable: true
+                },
+                new go.Binding("desiredSize", "showcomment", function(b) {return b ? new go.Size(NaN, NaN) : new go.Size(0,0) }),
+                new go.Binding("text", "text") 
+                ),
+          // four small named ports, one on each side:
+          makePort("T", go.Spot.Top, true, true),
+          makePort("L", go.Spot.Left, true, true),
+          makePort("R", go.Spot.Right, true, true),
+          makePort("B", go.Spot.Bottom, true, true),
+          { // handle mouse enter/leave events to show/hide the ports
+            mouseEnter: (e, node) => showSmallPorts(node, true),
+            mouseLeave: (e, node) => showSmallPorts(node, false)
+          }));
+          
+      d.nodeTemplateMap.add("SIDE",
+      $(go.Node, "Spot",
+          { locationSpot: go.Spot.Center },
+          { selectable: true, selectionAdornmentTemplate: nodeSelectionAdornmentTemplate },
+          { resizable: true, resizeObjectName: "PANEL", resizeAdornmentTemplate: nodeResizeAdornmentTemplate },
+          { doubleClick: function(e, node) { editSideDiagram(node); } },
+          new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+          new go.Binding("resizable", "resizable"),
+          // the main object is a Panel that surrounds a TextBlock with a Shape
+          $(go.Panel, "Auto",
+          { name: "PANEL" },
+          { desiredSize: new go.Size.parse("20 20") },
+          new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+        //    new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify),
+          $(go.Shape, "Rectangle",  // default figure
+              {
+              portId: "", // the default port: if no spot on link data, use closest side
+              strokeWidth: 0,
+              fill: "rgba(255,0,0,0.6)",  // default color
+              },
+              new go.Binding("fill")  
+          )),
           $(go.TextBlock,
             {
-              alignment: go.Spot.Left,
-              editable: true,
+              textAlign: "center",
+              font: "bold 11pt Helvetica, Arial, sans-serif",
               margin: 5,
-              font: groupFont(),
-              opacity: 0.75,  // allow some color to show through
-              stroke: "#404040"
+              stroke: "rgba(0,0,0,1)",
+              maxSize: new go.Size(NaN, NaN),
+              wrap: go.TextBlock.WrapFit,
+              editable: true
             },
-            //new go.Binding("font", "horiz", groupFont),
-            new go.Binding("text", "text").makeTwoWay())
-        ),  // end Horizontal Panel
-        $(go.Placeholder,
-          { padding: 5, alignment: go.Spot.TopLeft })
-      ),  // end Vertical Panel
-        // four small named ports, one on each side:
-        makePort("T", go.Spot.Top, false, true),
-        makePort("L", go.Spot.Left, true, true),
-        makePort("R", go.Spot.Right, true, true),
-        makePort("B", go.Spot.Bottom, true, false),
-        { // handle mouse enter/leave events to show/hide the ports
-          mouseEnter: (e, node) => showSmallPorts(node, true),
-          mouseLeave: (e, node) => showSmallPorts(node, false)
-        }
-      ));
-  
+            new go.Binding("desiredSize", "showcomment", function(b) {return b ? new go.Size(NaN, NaN) : new go.Size(0,0) }),
+            new go.Binding("text", "text") 
+          ),
+          // four small named ports, one on each side:
+          makePort("T", go.Spot.Top, true, true),
+          makePort("L", go.Spot.Left, true, true),
+          makePort("R", go.Spot.Right, true, true),
+          makePort("B", go.Spot.Bottom, true, true),
+          { // handle mouse enter/leave events to show/hide the ports
+            mouseEnter: (e, node) => showSmallPorts(node, true),
+            mouseLeave: (e, node) => showSmallPorts(node, false)
+          }));   
 
-    myDiagram.groupTemplateMap.add("NoLayout",
-      $(go.Group, "Auto",
-      { background: "white",
-        ungroupable: true,
-        // highlight when dragging into the Group
-        mouseDragEnter: function(e, grp, prev) { highlightGroup(e, grp, true); },
-        mouseDragLeave: function(e, grp, next) { highlightGroup(e, grp, false); },
-        computesBoundsAfterDrag: true,
-        // when the selection is dropped into a Group, add the selected Parts into that Group;
-        // if it fails, cancel the tool, rolling back any changes
-        mouseDrop: finishDrop,
-        handlesDragDropForMembers: true,  // don't need to define handlers on member Nodes and Links
-        // Groups containing Groups lay out their members horizontally
-       // layout: makeLayout(false), //auto layout
-      },
-//      new go.Binding("layout", "horiz", makeLayout(true)),
-      new go.Binding("background", "isHighlighted", function(h) {
-        return h ? "rgba(255,0,0,0.2)" : "white";
-      }).ofObject(),
-      $(go.Shape, "Rectangle", //outer frame
-        { fill: "rgba(255,255,255,255,20)", stroke: groupColor(), strokeWidth: 2 },
-       // new go.Binding("stroke", "horiz", groupColor),
-        new go.Binding("stroke", "fill")), 
-      $(go.Panel, "Vertical",  // title above Placeholder
-        $(go.Panel, "Horizontal",  // button next to TextBlock
-          { desiredSize: new go.Size(NaN, 35) ,stretch: go.GraphObject.Horizontal, background: groupColor() },
-         new go.Binding("desiredSize", "title", function(t) {
-        return t ? new go.Size(NaN, 35) : new go.Size(NaN, 0);
-      }),
-          new go.Binding("background", "fill"),
+      var linkSelectionAdornmentTemplate =
+        $(go.Adornment, "Link",
+          $(go.Shape,
+            // isPanelMain declares that this Shape shares the Link.geometry
+            { isPanelMain: true, fill: null, stroke: "deepskyblue", strokeWidth: 0 })  // use selection object's strokeWidth
+        );
+
+      d.linkTemplateMap.add("",
+        $(go.Link,  // the whole link panel
+          { selectable: true, selectionAdornmentTemplate: linkSelectionAdornmentTemplate },
+          { relinkableFrom: true, relinkableTo: true, reshapable: true },
+          {
+            routing: go.Link.Orthogonal,
+            curve: go.Link.JumpOver,
+            corner: 5,
+            toShortLength: 4
+          },
+          new go.Binding("routing", "routing"),
+          new go.Binding("points").makeTwoWay(),
+          $(go.Shape,  // the link path shape
+            { isPanelMain: true, strokeWidth: 1 }),
+          $(go.Shape,  // the arrowhead
+            { toArrow: "Standard", stroke: null }),
+          $(go.Panel, "Auto",
+            new go.Binding("visible", "isSelected").ofObject(),
+            $(go.Shape, "RoundedRectangle",  // the link shape
+              { fill: "#F8F8F8", stroke: null }),
+            $(go.TextBlock,
+              {
+                textAlign: "center",
+                font: "10pt helvetica, arial, sans-serif",
+                stroke: "#919191",
+                margin: 2,
+                minSize: new go.Size(10, NaN),
+                editable: true
+              },
+              new go.Binding("text").makeTwoWay())
+          )
+        ));
+
+      d.groupTemplateMap.add("",
+        $(go.Group, "Auto",
+        {
+          background: "white",
+          ungroupable: true,
+          // highlight when dragging into the Group
+          mouseDragEnter: function(e, grp, prev) { highlightGroup(e, grp, true); },
+          mouseDragLeave: function(e, grp, next) { highlightGroup(e, grp, false); },
+          computesBoundsAfterDrag: true,
+          // when the selection is dropped into a Group, add the selected Parts into that Group;
+          // if it fails, cancel the tool, rolling back any changes
+          mouseDrop: finishDrop,
+          handlesDragDropForMembers: true,  // don't need to define handlers on member Nodes and Links
+          // Groups containing Groups lay out their members horizontally
+          layout: makeLayout(false) //makeLayout() => go.GridLayout obj
+        },
+        //below is header section
+        new go.Binding("layout", "horiz", makeLayout),
+        new go.Binding("background", "isHighlighted", function(h) {
+          return h ? "rgba(255,0,0,0.2)" : "white";
+        }).ofObject(),
+        $(go.Shape, "Rectangle",
+          { fill: "rgba(255,255,255,255,20)", stroke: groupColor(), strokeWidth: 2 },
+          //new go.Binding("stroke", "horiz", groupColor),
+          new go.Binding("stroke", "fill")),
+        $(go.Panel, "Vertical",  // title above Placeholder
+          $(go.Panel, "Horizontal",  // button next to TextBlock
+            { desiredSize: new go.Size(NaN, NaN) , stretch: go.GraphObject.Horizontal, background: groupColor() },
+            new go.Binding("desiredSize", "title", function(t) {
+          return t ? new go.Size(NaN, 35) : new go.Size(NaN, 0);
+        }),
+            //new go.Binding("background", "horiz", groupColor),
+            new go.Binding("background", "fill"),
           $("SubGraphExpanderButton",
-            { alignment: go.Spot.Right, margin: 10 }),
-          $(go.TextBlock,
-            {
-              alignment: go.Spot.Left,
-              editable: true,
-              margin: 10,
-              font: groupFont(),
-              opacity: 0.75,  // allow some color to show through
-              stroke: "404040"
-            },
-            //new go.Binding("font", "horiz", groupFont),
-            new go.Binding("text", "text").makeTwoWay())
-        ),  // end Horizontal Panel
-            $(go.Placeholder,
-            { padding: 0, alignment: go.Spot.TopLeft }
-            ) 
-          ),  // end Vertical Panel
-        // four small named ports, one on each side:
-        makePort("T", go.Spot.Top, false, true),
-        makePort("L", go.Spot.Left, true, true),
-        makePort("R", go.Spot.Right, true, true),
-        makePort("B", go.Spot.Bottom, true, false),
-        { // handle mouse enter/leave events to show/hide the ports
-          mouseEnter: (e, node) => showSmallPorts(node, true),
-          mouseLeave: (e, node) => showSmallPorts(node, false)
-        }
-      ));
+              { alignment: go.Spot.Right, margin: 10 }),
+            $(go.TextBlock,
+              {
+                alignment: go.Spot.Left,
+                editable: true,
+                margin: 5,
+                font: groupFont(),
+                opacity: 0.75,  // allow some color to show through
+                stroke: "#404040"
+              },
+              //new go.Binding("font", "horiz", groupFont),
+              new go.Binding("text", "text").makeTwoWay())
+          ),  // end Horizontal Panel
+          $(go.Placeholder,
+            { padding: 5, alignment: go.Spot.TopLeft })
+        ),  // end Vertical Panel
+          // four small named ports, one on each side:
+          makePort("T", go.Spot.Top, false, true),
+          makePort("L", go.Spot.Left, true, true),
+          makePort("R", go.Spot.Right, true, true),
+          makePort("B", go.Spot.Bottom, true, false),
+          { // handle mouse enter/leave events to show/hide the ports
+            mouseEnter: (e, node) => showSmallPorts(node, true),
+            mouseLeave: (e, node) => showSmallPorts(node, false)
+          }
+        ));
 
+      d.groupTemplateMap.add("NoLayout",
+        $(go.Group, "Auto",
+        { background: "white",
+          ungroupable: true,
+          // highlight when dragging into the Group
+          mouseDragEnter: function(e, grp, prev) { highlightGroup(e, grp, true); },
+          mouseDragLeave: function(e, grp, next) { highlightGroup(e, grp, false); },
+          computesBoundsAfterDrag: true,
+          // when the selection is dropped into a Group, add the selected Parts into that Group;
+          // if it fails, cancel the tool, rolling back any changes
+          mouseDrop: finishDrop,
+          handlesDragDropForMembers: true,  // don't need to define handlers on member Nodes and Links
+          // Groups containing Groups lay out their members horizontally
+        // layout: makeLayout(false), //auto layout
+        },
+  //      new go.Binding("layout", "horiz", makeLayout(true)),
+        new go.Binding("background", "isHighlighted", function(h) {
+          return h ? "rgba(255,0,0,0.2)" : "white";
+        }).ofObject(),
+        $(go.Shape, "Rectangle", //outer frame
+          { fill: "rgba(255,255,255,255,20)", stroke: groupColor(), strokeWidth: 2 },
+        // new go.Binding("stroke", "horiz", groupColor),
+          new go.Binding("stroke", "fill")), 
+        $(go.Panel, "Vertical",  // title above Placeholder
+          $(go.Panel, "Horizontal",  // button next to TextBlock
+            { desiredSize: new go.Size(NaN, 35) ,stretch: go.GraphObject.Horizontal, background: groupColor() },
+          new go.Binding("desiredSize", "title", function(t) {
+          return t ? new go.Size(NaN, 35) : new go.Size(NaN, 0);
+        }),
+            new go.Binding("background", "fill"),
+            $("SubGraphExpanderButton",
+              { alignment: go.Spot.Right, margin: 10 }),
+            $(go.TextBlock,
+              {
+                alignment: go.Spot.Left,
+                editable: true,
+                margin: 10,
+                font: groupFont(),
+                opacity: 0.75,  // allow some color to show through
+                stroke: "#404040"
+              },
+              //new go.Binding("font", "horiz", groupFont),
+              new go.Binding("text", "text").makeTwoWay())
+          ),  // end Horizontal Panel
+              $(go.Placeholder,
+              { padding: 0, alignment: go.Spot.TopLeft }
+              ) 
+            ),  // end Vertical Panel
+          // four small named ports, one on each side:
+          makePort("T", go.Spot.Top, false, true),
+          makePort("L", go.Spot.Left, true, true),
+          makePort("R", go.Spot.Right, true, true),
+          makePort("B", go.Spot.Bottom, true, false),
+          { // handle mouse enter/leave events to show/hide the ports
+            mouseEnter: (e, node) => showSmallPorts(node, true),
+            mouseLeave: (e, node) => showSmallPorts(node, false)
+          }
+        ));
+    }
 
+    setTemplate(myDiagram);
+    setTemplate(mySideDiagram);
 
     // temporary links used by LinkingTool and RelinkingTool are also orthogonal:
     myDiagram.toolManager.linkingTool.temporaryLink.routing = go.Link.Orthogonal;
@@ -678,15 +707,14 @@ function showTextarea() {
                 { toArrow: "Standard", stroke: null })
             ),
          */
-         
             model: new go.GraphLinksModel([  // specify the contents of the Palette
             { category: "LABEL", text: "Label", fill: "#FFFFFF"},
             { category: "IMAGE", text: "IMAGE", fill: "#FFFFFF"},
             { category: "FILL", fill: "rgba(255,0,0,0.6)", resizable: true, showcomment: false, linkable: false },                       
             { category: "PIN", fill: "rgba(255,0,0,0.6)", resizable: false, showcomment: false, linkable: false },                       
+            { category: "SIDE", fill: "rgba(139,230,0,0.6)", resizable: false, showcomment: false, linkable: false },                       
             { category: "NoLayout", isGroup: true, text: "NoLayout", figure: "RoundedRectangle", fill: "lightblue", title: true },
-            { category: "", isGroup: true, text: "Layout", figure: "RoundedRectangle", fill: "lightblue" , horiz: true, title: true },
-            { category: "test", isGroup: true, text: "Layout", figure: "RoundedRectangle", fill: "lightblue" , horiz: true, title: true }
+            { category: "", isGroup: true, text: "Layout", figure: "RoundedRectangle", fill: "lightblue" , horiz: true, title: true } 
           ])
         });
 
@@ -774,8 +802,8 @@ function showTextarea() {
               }
             },
             // an example of specifying the <input> type
-            "img": {  show: Inspector.showIfNode }, 
-            "sample1": { show: Inspector.showIfPresent, type: 'password' },
+            "img": {  show: Inspector.showIfNode },
+           // "sample1": { show: Inspector.showIfPresent, type: 'password' },
             "from": { show: false },  // must not be shown at all
             "to": { show: false },  // must not be shown at all
             "points": { show: false }  // must not be shown at all
@@ -839,9 +867,25 @@ function showTextarea() {
         document.getElementById("mySavedModel").value = myDiagram.model.toJson();
         myDiagram.isModified = false;
     }
+
     function load() {
         myDiagram.model = go.Model.fromJson(document.getElementById("mySavedModel").value);
         myDiagram.delayInitialization(relayoutDiagram);
+    }
+    
+    // Show the diagram's model in JSON format
+    function saveSideDiagram(n) {
+        //document.getElementById("mySavedModel").value = myDiagram.model.toJson();
+       n.data.model = mySideDiagram.model;
+       mySideDiagram.isModified = false;
+    }
+
+    function loadSideDiagram(n) {
+        //mySideDiagram.model = go.Model.fromJson(document.getElementById("mySavedModel").value);
+        if (n.data.model !== undefined) {
+          mySideDiagram.model = n.data.model;
+          mySideDiagram.delayInitialization(relayoutDiagram);
+        }
     }
 
   window.addEventListener('DOMContentLoaded', init);
@@ -862,9 +906,10 @@ function showTextarea() {
       <div id="myMenu">
         
       </div>
-      <div id="myInspectorDiv" class="inspector"><table><tbody><tr><td>text</td><td><input type="undefined" tabindex="0"></td></tr><tr><td>LinkComments</td><td><input type="undefined" tabindex="1"></td></tr><tr><td>from</td><td><input tabindex="2"></td></tr><tr><td>to</td><td><input tabindex="3"></td></tr><tr><td>fromPort</td><td><input tabindex="4"></td></tr><tr><td>toPort</td><td><input tabindex="5"></td></tr><tr><td>points</td><td><input tabindex="6"></td></tr></tbody></table></div>
+      <div id="myInspectorDiv" class="inspector" style="display: none"><table><tbody><tr><td>text</td><td><input type="undefined" tabindex="0"></td></tr><tr><td>LinkComments</td><td><input type="undefined" tabindex="1"></td></tr><tr><td>from</td><td><input tabindex="2"></td></tr><tr><td>to</td><td><input tabindex="3"></td></tr><tr><td>fromPort</td><td><input tabindex="4"></td></tr><tr><td>toPort</td><td><input tabindex="5"></td></tr><tr><td>points</td><td><input tabindex="6"></td></tr></tbody></table></div>
       <div id="myPaletteDiv" style="width: 130px; margin-right: 2px; background-color:  whitesmoke; border: 1px solid black; position: relative;"><canvas tabindex="0" width="128" height="498" style="position: absolute; top: 0px; left: 0px; z-index: 2; touch-action: none; width: 128px; height: 498px;">This text is displayed if your browser does not support the Canvas HTML element.</canvas><div style="position: absolute; overflow: auto; width: 128px; height: 498px; z-index: 1;"><div style="position: absolute; width: 1px; height: 1px;"></div></div></div>
-      <div id="myDiagramDiv" style="flex-grow: 1; height: 90vh; background-color:  whitesmoke; border: 1px solid black; position: relative;"><canvas tabindex="0" width="922" height="498" style="position: absolute; top: 0px; left: 0px; z-index: 2; touch-action: none; width: 922px; height: 498px;">This text is displayed if your browser does not support the Canvas HTML element.</canvas><div style="position: absolute; overflow: auto; width: 922px; height: 498px; z-index: 1;"><div style="position: absolute; width: 1px; height: 1px;"></div></div></div>
+      <div id="myDiagramDiv" style="flex-grow: 2; height: 90vh; background-color:  whitesmoke; border: 1px solid black; position: relative;"><canvas tabindex="0" width="922" height="498" style="position: absolute; top: 0px; left: 0px; z-index: 2; touch-action: none; width: 922px; height: 498px;">This text is displayed if your browser does not support the Canvas HTML element.</canvas><div style="position: absolute; overflow: auto; width: 922px; height: 498px; z-index: 1;"><div style="position: absolute; width: 1px; height: 1px;"></div></div></div>
+      <div id="mySideDiagramDiv" style="display: none; flex-grow: 1; background-color:  whitesmoke; border: 1px solid black; position: relative;"><canvas tabindex="0" width="922" height="498" style="position: absolute; top: 0px; left: 0px; z-index: 2; touch-action: none; width: 922px; height: 498px;">This text is displayed if your browser does not support the Canvas HTML element.</canvas><div style="position: absolute; overflow: auto; width: 922px; height: 498px; z-index: 1;"><div style="position: absolute; width: 1px; height: 1px;"></div></div></div>
     </div>
 
     <span style="display: inline-block; vertical-align: top;">
@@ -958,12 +1003,7 @@ background-color: #424242;
 }
 
 </style>
-
-
-
 <!-- removed => Figures.js -->
 </div>
-
-
 
 </body></html>
